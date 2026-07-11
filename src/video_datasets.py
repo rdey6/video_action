@@ -58,9 +58,11 @@ class VideoDataset(Dataset):
         """
         # Get all JPEG frame paths from the video directory and select up to fr_per_vid frames
         fr_paths = glob.glob(self.dataset[idx][0] + '/*.jpg')
-        indices = np.linspace(0, len(fr_paths)-1, self.fpv, dtype=int)
-        fr_paths = [fr_paths[i] for i in indices]
-        #fr_paths = fr_paths[:self.fpv]
+        if len(fr_paths) >= self.fpv:
+            indices = np.linspace(0, len(fr_paths)-1, self.fpv, dtype=int)
+            fr_paths = [fr_paths[i] for i in indices]
+        else:
+            fr_paths = fr_paths[:self.fpv]
         
         # Open images using PIL
         fr_imgs = [Image.open(fr_path) for fr_path in fr_paths]
