@@ -20,6 +20,7 @@ import glob
 from tqdm import tqdm
 import numpy as np
 from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import GroupShuffleSplit
 
 
 class VideoDataset(Dataset):
@@ -57,7 +58,9 @@ class VideoDataset(Dataset):
         """
         # Get all JPEG frame paths from the video directory and select up to fr_per_vid frames
         fr_paths = glob.glob(self.dataset[idx][0] + '/*.jpg')
-        fr_paths = fr_paths[:self.fpv]
+        indices = np.linspace(0, len(fr_paths)-1, self.fpv, dtype=int)
+        fr_paths = [fr_paths[i] for i in indices]
+        #fr_paths = fr_paths[:self.fpv]
         
         # Open images using PIL
         fr_imgs = [Image.open(fr_path) for fr_path in fr_paths]
@@ -123,20 +126,27 @@ def dataset_split(vid_dataset, tr_ratio, ts_ratio, seed=0):
     """
     vid_paths = np.array([vid_path for vid_path in vid_dataset.keys()])
     vid_labels = np.array([vid_label for vid_label in vid_dataset.values()])
+    
+    groups = np.array([int(os.path.basename(path).split("_g")[1].split("_c")[0])
+                        for path in vid_paths])
+    
     print('Splitting train/validation/test datasets....')
 
     # Test split using StratifiedShuffleSplit
-    ts_spliter = StratifiedShuffleSplit(n_splits=1, test_size=ts_ratio, random_state=seed)
-    for tr_val_idx, ts_idx in ts_spliter.split(vid_paths, vid_labels):
+    #ts_spliter = StratifiedShuffleSplit(n_splits=1, test_size=ts_ratio, random_state=seed)
+    ts_spliter = GroupShuffleSplit(n_splits=1, test_size=ts_ratio, random_state=seed)
+    for tr_val_idx, ts_idx in ts_spliter.split(vid_paths, vid_labels, groups):
         ts_paths, ts_labels = vid_paths[ts_idx], vid_labels[ts_idx]
         tr_val_paths, tr_val_labels = vid_paths[tr_val_idx], vid_labels[tr_val_idx]
+        tr_val_groups = groups[tr_val_idx]
     ts_dataset = [(ts_path, ts_label) for ts_path, ts_label in zip(ts_paths, ts_labels)]
 
     # Train/validation split
     val_ratio = 1 - tr_ratio - ts_ratio
     val_wt = val_ratio / (tr_ratio + val_ratio)
-    val_spliter = StratifiedShuffleSplit(n_splits=1, test_size=val_wt, random_state=seed)
-    for tr_idx, val_idx in val_spliter.split(tr_val_paths, tr_val_labels):
+    #val_spliter = StratifiedShuffleSplit(n_splits=1, test_size=val_wt, random_state=seed)
+    val_spliter = GroupShuffleSplit(n_splits=1, test_size=val_wt, random_state=seed)
+    for tr_idx, val_idx in val_spliter.split(tr_val_paths, tr_val_labels, tr_val_groups):
         tr_paths, tr_labels = tr_val_paths[tr_idx], tr_val_labels[tr_idx]
         val_paths, val_labels = tr_val_paths[val_idx], tr_val_labels[val_idx]
     tr_dataset = [(tr_path, tr_label) for tr_path, tr_label in zip(tr_paths, tr_labels)]

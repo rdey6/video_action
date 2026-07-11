@@ -15,6 +15,7 @@ Functions:
 import torch
 from tqdm import tqdm
 from sklearn.metrics import classification_report, multilabel_confusion_matrix
+import wandb
 
 def test(model, dataloader, device):
     """
@@ -51,6 +52,8 @@ def test(model, dataloader, device):
             targets.extend(y_batch.detach().cpu().numpy().tolist())
         
         accuracy = total_correct_preds / float(len_dataset)
+
+        wandb.log({"test_accuracy": accuracy})
     
     return targets, outputs, accuracy
 
@@ -69,7 +72,12 @@ def get_test_report(target, output, target_names):
     Returns:
         dict: A classification report as a dictionary.
     """
-    return classification_report(target, output, output_dict=True, target_names=target_names)
+    report = classification_report(target, output, output_dict=True, target_names=target_names)
+
+    wandb.log({"test_classification_report": report})
+
+    return report
+    #return classification_report(target, output, output_dict=True, target_names=target_names)
 
 def get_confusion_matrix(targets, outputs, labels_dict, all_cats):
     """
@@ -87,9 +95,14 @@ def get_confusion_matrix(targets, outputs, labels_dict, all_cats):
     Returns:
         dict: A dictionary where keys are class names and values are the corresponding confusion matrices.
     """
+    
     # Create an inverse mapping from numeric label to class name
     inv_labels_dict = {label: cat for cat, label in labels_dict.items()}
     target_cats = [inv_labels_dict[target] for target in targets]
     output_cats = [inv_labels_dict[output] for output in outputs]
     confusion_mat = multilabel_confusion_matrix(target_cats, output_cats, labels=all_cats)
+    wandb.log({"test_confusion_matrix": wandb.plot.confusion_matrix(y_true=targets,
+                                                                    preds=outputs,
+                                                                    class_names=all_cats)})
+
     return {label: mat for label, mat in zip(all_cats, confusion_mat)}

@@ -1,0 +1,43 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# Model checkpoints
+models/
+*.pt
+*.pth
+*.ckpt
+
+# Dataset and extracted frames
+data/
+dataset/
+frames/
+videos/
+
+# Experiment logs
+wandb/
+logs/
+runs/
+
+# TensorBoard
+tensorboard/
+events.out.tfevents.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.log
+
+# Secrets
+.env

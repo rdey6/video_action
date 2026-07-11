@@ -18,6 +18,7 @@ import os
 import copy
 from tqdm import tqdm
 import torch
+import wandb
 
 def train(dataloaders, model, criterion, optimizer, scheduler, device, optim_model_wts_dir, n_epochs=30):
     """
@@ -83,6 +84,14 @@ def train(dataloaders, model, criterion, optimizer, scheduler, device, optim_mod
         print("train loss: {:.6f}, val loss: {:.6f}, accuracy: {:.2f}".format(train_loss, val_loss, 100*val_accuracy))
         print("-" * 60)
         print()
+
+        wandb.log({"epoch": epoch + 1,
+                   "train_loss": train_loss,
+                   "train_accuracy": train_accuracy,
+                   "val_loss": val_loss,
+                   "val_accuracy": val_accuracy,
+                   "learning_rate": current_lr
+                  })
 
     # Load the best model weights before returning the model
     model.load_state_dict(best_model_wts)

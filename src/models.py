@@ -15,6 +15,7 @@ Classes:
 
 import torch.nn as nn
 from torchvision import models
+import torch
 
 class Identity(nn.Module):
     """
@@ -42,6 +43,36 @@ class Identity(nn.Module):
         """
         return x
 
+class TemporalAttention(nn.Module):
+    """
+    Learns attention weights over all LSTM outputs.
+    """
+
+    def __init__(self, hidden_size):
+        super(TemporalAttention, self).__init__()
+
+        self.attention = nn.Linear(hidden_size, 1)
+
+    def forward(self, lstm_output):
+        """
+        Args:
+            lstm_output: (batch_size, time_steps, hidden_size)
+
+        Returns:
+            context: (batch_size, hidden_size)
+        """
+
+        # Compute attention scores
+        scores = self.attention(lstm_output)          # (B,T,1)
+
+        # Normalize scores
+        weights = torch.softmax(scores, dim=1)        # (B,T,1)
+
+        # Weighted sum of LSTM outputs
+        context = torch.sum(weights * lstm_output, dim=1)
+
+        return context
+    
 class LRCN(nn.Module):
     """
     LRCN (Long-term Recurrent Convolutional Network) for video classification.
@@ -89,13 +120,17 @@ class LRCN(nn.Module):
         self.base_model = base_cnn
 
         # Define the LSTM to process the sequence of frame features.
-        self.rnn = nn.LSTM(num_features, hidden_size, n_layers)
+        #self.rnn = nn.LSTM(num_features, hidden_size, n_layers)
+        self.rnn = nn.LSTM(num_features, hidden_size, n_layers, batch_first=True, bidirectional=True)
+
+        self.attention = TemporalAttention(hidden_size * 2)
         
         # Define dropout for regularization.
         self.dropout = nn.Dropout(dropout_rate)
         
         # Final fully-connected layer to produce logits for each class.
-        self.fc = nn.Linear(hidden_size, n_classes)
+        #self.fc = nn.Linear(hidden_size, n_classes)
+        self.fc = nn.Linear(hidden_size * 2, n_classes)
 
     def forward(self, x):
         """
@@ -104,9 +139,12 @@ class LRCN(nn.Module):
         The input tensor x is expected to have the shape:
             (batch_size, time_steps, channels, height, width)
         
-        For each time step (frame), the CNN backbone extracts features. These features are then
-        passed through the LSTM sequentially. The output from the last time step is then passed
-        through dropout and the final fully-connected layer to produce the class logits.
+        Each frame is first processed independently by the CNN backbone to extract spatial
+        features. The sequence of frame features is then passed through a bidirectional LSTM
+        to model temporal dependencies across the video. A temporal attention mechanism learns
+        the importance of each time step and computes a weighted combination of the LSTM outputs.
+        The resulting context vector is regularized using dropout and passed through the final
+        fully-connected layer to produce class logits.
 
         Args:
             x (Tensor): Input tensor of shape (batch_size, time_steps, channels, height, width).
@@ -116,19 +154,44 @@ class LRCN(nn.Module):
         """
         bs, ts, c, h, w = x.shape  # batch_size, time_steps, channels, height, width
         
+        ###Commenting out - start
         # Process the first frame separately to initialize the LSTM hidden and cell states.
-        idx = 0
-        y = self.base_model(x[:, idx])
-        _, (hn, cn) = self.rnn(y.unsqueeze(1))
+        ##idx = 0
+        ##y = self.base_model(x[:, idx])
+        ##_, (hn, cn) = self.rnn(y.unsqueeze(1))
         
         # Iterate over the remaining frames, feeding each frame's features into the LSTM.
-        for idx in range(1, ts):
-            y = self.base_model(x[:, idx])
-            out, (hn, cn) = self.rnn(y.unsqueeze(1), (hn, cn))
+        ##for idx in range(1, ts):
+        ##    y = self.base_model(x[:, idx])
+        ##    out, (hn, cn) = self.rnn(y.unsqueeze(1), (hn, cn))
         
         # Apply dropout to the output of the final time step.
-        out = self.dropout(out[:, -1])
+        ##out = self.dropout(out[:, -1])
         
         # Pass the final output through the fully-connected layer to get class logits.
-        out = self.fc(out)
+        ##out = self.fc(out)
+        ##return out
+        ###Commenting out - end
+        # Extract CNN features for every frame
+
+        features = []
+
+        for idx in range(ts):
+            y = self.base_model(x[:, idx])
+            features.append(y)
+
+        # (B,T,F)
+        features = torch.stack(features, dim=1)
+
+        # Process the whole sequence once
+        lstm_out, _ = self.rnn(features)
+
+        # Temporal attention
+        context = self.attention(lstm_out)
+
+        # Dropout + classifier
+        context = self.dropout(context)
+
+        out = self.fc(context)
+
         return out
