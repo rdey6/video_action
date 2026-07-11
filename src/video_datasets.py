@@ -58,6 +58,8 @@ class VideoDataset(Dataset):
         """
         # Get all JPEG frame paths from the video directory and select up to fr_per_vid frames
         fr_paths = glob.glob(self.dataset[idx][0] + '/*.jpg')
+        if len(fr_paths) == 0:
+            raise RuntimeError(f"No frames found: {self.dataset[idx][0]}")
         if len(fr_paths) >= self.fpv:
             indices = np.linspace(0, len(fr_paths)-1, self.fpv, dtype=int)
             fr_paths = [fr_paths[i] for i in indices]
@@ -76,6 +78,12 @@ class VideoDataset(Dataset):
         # Stack transformed images into a tensor if available
         if len(fr_imgs_trans) > 0:
             fr_imgs_trans = torch.stack(fr_imgs_trans)
+
+        if fr_imgs_trans is None:
+            print("None frames at index:", idx)
+            print("Video:", self.dataset[idx][0])
+            raise RuntimeError("Dataset returned None")
+        print(type(fr_imgs_trans))
 
         return fr_imgs_trans, fr_label
 
