@@ -21,6 +21,7 @@ from tqdm import tqdm
 import numpy as np
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.model_selection import GroupShuffleSplit
+from utils import get_frames, store_frames
 
 
 class VideoDataset(Dataset):
@@ -58,13 +59,7 @@ class VideoDataset(Dataset):
         """
         # Get all JPEG frame paths from the video directory and select up to fr_per_vid frames
         fr_paths = glob.glob(self.dataset[idx][0] + '/*.jpg')
-        if len(fr_paths) == 0:
-            raise RuntimeError(f"No frames found: {self.dataset[idx][0]}")
-        if len(fr_paths) >= self.fpv:
-            indices = np.linspace(0, len(fr_paths)-1, self.fpv, dtype=int)
-            fr_paths = [fr_paths[i] for i in indices]
-        else:
-            fr_paths = fr_paths[:self.fpv]
+        fr_paths = fr_paths[:self.fpv]
         
         # Open images using PIL
         fr_imgs = [Image.open(fr_path) for fr_path in fr_paths]
@@ -88,7 +83,7 @@ class VideoDataset(Dataset):
         return fr_imgs_trans, fr_label
 
 
-def load_dataset(frame_dir):
+def load_dataset(frame_dir, n_frames=16):
     """
     Load the full video dataset from the specified directory.
     
@@ -111,7 +106,12 @@ def load_dataset(frame_dir):
         vid_cat_path = os.path.join(frame_dir, vid_cat)
         for vid in os.listdir(vid_cat_path):
             vid_path = os.path.join(vid_cat_path, vid)
-            vid_dataset[vid_path] = label_dict[vid_cat]
+            #vid_dataset[vid_path] = label_dict[vid_cat]
+            frame_store_dir = os.path.join(vid_cat_path, os.path.splitext(vid)[0])
+            os.makedirs(frame_store_dir, exist_ok=True)
+            frames, _ = get_frames(vid_path, n_frames=n_frames)
+            store_frames(frames, frame_store_dir)
+            vid_dataset[frame_store_dir] = label_dict[vid_cat]
     return vid_dataset, label_dict
 
 
