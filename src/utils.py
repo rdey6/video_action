@@ -17,6 +17,8 @@ import numpy as np
 from torchvision import transforms as transforms
 from torch.utils.data import DataLoader
 #from video_datasets import collate_fn_r3d_18, collate_fn_rnn
+import torch
+from torch.nn.utils.rnn import pad_sequence
 
 
 def get_frames(vid, n_frames=1):
