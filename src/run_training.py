@@ -154,21 +154,6 @@ def trainer(args):
     model = LRCN(hidden_size=rnn_hidden_size, n_layers=rnn_n_layers, dropout_rate=dropout,
                  n_classes=n_classes, pretrained=pretrained, cnn_model=cnn_backbone)
     model = model.to(device)
-
-    wandb.init(project="UCF50-LRCN",
-               name="BiLSTM_TemporalAttention",
-               config={"model": "LRCN",
-                       "cnn_backbone": cnn_backbone,
-                       "hidden_size": rnn_hidden_size,
-                       "lstm_layers": rnn_n_layers,
-                       "bidirectional": True,
-                       "attention": True,
-                       "batch_size": batch_size,
-                       "epochs": n_epochs,
-                       "optimizer": "AdamW",
-                       "learning_rate": learning_rate
-                      }
-              )
     
     # Define the loss function, optimizer, and learning rate scheduler
     loss_func = nn.CrossEntropyLoss(reduction='sum')

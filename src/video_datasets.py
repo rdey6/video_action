@@ -74,12 +74,6 @@ class VideoDataset(Dataset):
         if len(fr_imgs_trans) > 0:
             fr_imgs_trans = torch.stack(fr_imgs_trans)
 
-        if fr_imgs_trans is None:
-            print("None frames at index:", idx)
-            print("Video:", self.dataset[idx][0])
-            raise RuntimeError("Dataset returned None")
-        print(type(fr_imgs_trans))
-
         return fr_imgs_trans, fr_label
 
 
@@ -107,6 +101,11 @@ def load_dataset(frame_dir, n_frames=16):
         for vid in os.listdir(vid_cat_path):
             vid_path = os.path.join(vid_cat_path, vid)
             #vid_dataset[vid_path] = label_dict[vid_cat]
+            if os.path.isdir(vid_path):
+                vid_dataset[vid_path] = label_dict[vid_cat]
+                continue
+            if not vid.endswith((".avi", ".mp4", ".mov")):
+                continue
             frame_store_dir = os.path.join(vid_cat_path, os.path.splitext(vid)[0])
             os.makedirs(frame_store_dir, exist_ok=True)
             frames, _ = get_frames(vid_path, n_frames=n_frames)

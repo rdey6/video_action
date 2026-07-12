@@ -31,6 +31,7 @@ from torch import optim
 from torch.optim.lr_scheduler import CosineAnnealingLR, ReduceLROnPlateau
 
 import numpy as np
+import wandb
 
 from video_datasets import VideoDataset, load_dataset, dataset_split
 from utils import transform_stats, compose_data_transforms, train_val_dloaders, test_dloaders
@@ -140,6 +141,21 @@ def main(args):
     model = LRCN(hidden_size=rnn_hidden_size, n_layers=rnn_n_layers, dropout_rate=dropout,
                  n_classes=n_classes, pretrained=pretrained, cnn_model=cnn_backbone)
 
+    wandb.init(project="UCF50-LRCN",
+                name="BiLSTM_TemporalAttention",
+                config={"model": "LRCN",
+                        "cnn_backbone": cnn_backbone,
+                        "hidden_size": rnn_hidden_size,
+                        "lstm_layers": rnn_n_layers,
+                        "bidirectional": True,
+                        "attention": True,
+                        "batch_size": batch_size,
+                        "epochs": n_epochs,
+                        "optimizer": "Adam",
+                        "learning_rate": learning_rate
+                        }
+                )
+    
     if mode == 'train':
         # Load dataset and split into train/validation/test
         vid_dataset, label_dict = load_dataset(frame_dir)
