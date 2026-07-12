@@ -84,6 +84,7 @@ def args_parser():
     parser.add_argument('-d', '--dropout', type=float, default=0.1, help='Dropout rate for regularization')
     parser.add_argument('-lr', '--learning_rate', type=float, default=3e-5, help='Learning rate for model training')
     parser.add_argument('-ne', '--n_epochs', type=int, default=30, help='Number of training epochs')
+    parser.add_argument('-bdir', '--best_dir', default='./models', help='Directory for saving best model checkpoints')
 
     args = parser.parse_args()
     return args
@@ -116,6 +117,7 @@ def main(args):
     ts_size = args.test_size
     fr_per_vid = args.fr_per_vid
     n_classes = args.n_classes
+    b_dir = args.best_dir
 
     # Model parameters
     model_type = args.model_type
@@ -176,8 +178,10 @@ def main(args):
         loss_func = nn.CrossEntropyLoss(reduction='sum')
         opt = optim.Adam(model.parameters(), lr=learning_rate)
         lr_scheduler = ReduceLROnPlateau(opt, mode='min', factor=0.5, patience=5) #, verbose=1)
-        os.makedirs("./models", exist_ok=True)
-        optim_model_dir = './models'
+        #os.makedirs("./models", exist_ok=True)
+        os.makedirs(b_dir, exist_ok=True)
+        #optim_model_dir = './models'
+        optim_model_dir = b_dir
 
         # Main training procedure
         model.to(device)
