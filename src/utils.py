@@ -16,7 +16,7 @@ import numpy as np
 
 from torchvision import transforms as transforms
 from torch.utils.data import DataLoader
-from video_datasets import collate_fn_r3d_18, collate_fn_rnn
+#from video_datasets import collate_fn_r3d_18, collate_fn_rnn
 
 
 def get_frames(vid, n_frames=1):
@@ -199,4 +199,65 @@ def test_dloaders(test_dataset, batch_size, model='lrcn'):
                              shuffle=False, collate_fn=collate_fn_r3d_18)
     dataloaders = {'test': test_dl}
     return dataloaders
+
+def collate_fn_r3d_18(batch):
+    """
+    Collate function for 3D CNN models (e.g., R3D-18).
+    
+    Assumes each sample in the batch is a tuple (video_frames, label),
+    where video_frames is a tensor of shape (T, C, H, W). This function filters out any samples
+    with no frames, stacks the video frame tensors, transposes the tensor dimensions as needed,
+    and stacks the labels.
+    
+    Args:
+        batch (list): List of samples, each as (video_frames, label).
+    
+    Returns:
+        tuple: (imgs_tensor, labels_tensor)
+            - imgs_tensor (Tensor): Stacked video frames tensor with shape adjusted for R3D-18.
+            - labels_tensor (Tensor): Tensor of labels.
+    """
+    imgs_batch, label_batch = list(zip(*batch))
+    imgs_batch = [imgs for imgs in imgs_batch if len(imgs) > 0]
+    label_batch = [torch.tensor(l) for l, imgs in zip(label_batch, imgs_batch) if len(imgs) > 0]
+    imgs_tensor = torch.stack(imgs_batch)
+    imgs_tensor = torch.transpose(imgs_tensor, 2, 1)
+    labels_tensor = torch.stack(label_batch)
+    return imgs_tensor, labels_tensor
+
+
+def collate_fn_rnn(batch):
+    """
+    Collate function for RNN-based models.
+    
+    Handles variable-length video sequences by padding them to the length of the longest sequence
+    in the batch. Each sample in the batch is expected to be a tuple (video_frames, label),
+    where video_frames is a tensor of shape (T, C, H, W). The function returns a padded tensor
+    of video frames with shape (batch_size, max_T, C, H, W) and a tensor of labels.
+    
+    Args:
+        batch (list): List of samples, each as (video_frames, label).
+    
+    Returns:
+        tuple: (padded_imgs, labels_tensor)
+            - padded_imgs (Tensor): Padded tensor of video frames.
+            - labels_tensor (Tensor): Tensor of labels.
+    """
+    # Unzip the batch into image tensors and labels
+    imgs_batch, label_batch = list(zip(*batch))
+    
+    # Filter out any samples that have no frames
+    valid_samples = [(imgs, label) for imgs, label in zip(imgs_batch, label_batch) if len(imgs) > 0]
+    if not valid_samples:
+        return None, None
+    imgs_batch, label_batch = zip(*valid_samples)
+    
+    # Pad the video frame tensors along the time dimension (T)
+    # Resulting shape: (batch_size, max_T, C, H, W)
+    padded_imgs = pad_sequence(imgs_batch, batch_first=True)
+    
+    # Convert labels to a tensor
+    labels_tensor = torch.tensor(label_batch)
+    
+    return padded_imgs, labels_tensor
 
