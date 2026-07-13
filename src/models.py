@@ -1,16 +1,21 @@
 """
 Module: models.py
 
-This module defines the LRCN (Long-term Recurrent Convolutional Network) model for video
-classification. The LRCN model combines a 2D CNN backbone (e.g., ResNet) for spatial feature
-extraction from individual frames with an LSTM to capture temporal dynamics across frames.
-An additional fully-connected layer is used to output the final class predictions.
+This module defines an enhanced LRCN (Long-term Recurrent Convolutional Network)
+model for video classification. The model combines a 2D CNN backbone (e.g., ResNet)
+for spatial feature extraction from individual frames with a bidirectional LSTM for
+temporal modeling across frame sequences. A multi-head self-attention mechanism
+refines temporal representations before feature aggregation and classification through
+a fully-connected prediction head.
 
 Classes:
-    Identity: A helper module that returns the input unchanged. It is used to replace the fully-connected
-              layer of the ResNet backbone.
-    LRCN: The main model that integrates the CNN backbone, an LSTM, dropout regularization, and a final
-          fully-connected layer to produce class logits.
+    Identity: A helper module that returns the input unchanged. It is used to replace
+              the fully-connected layer of the ResNet backbone.
+    TemporalAttention: A multi-head self-attention module for refining LSTM temporal
+                       representations.
+    LRCN: The main video classification model integrating CNN feature extraction,
+          bidirectional LSTM temporal modeling, temporal attention, pooling, and
+          fully-connected classification layers.
 """
 
 import torch.nn as nn
@@ -45,41 +50,48 @@ class Identity(nn.Module):
 
 class TemporalAttention(nn.Module):
     """
-    Learns attention weights over all LSTM outputs.
+    Multi-head self-attention module for temporal feature refinement.
+
+    This module applies self-attention across the sequence of LSTM outputs,
+    allowing each time step to attend to all other time steps and learn richer
+    temporal dependencies. The output is an attention-enhanced sequence of
+    features with the same shape as the input.
     """
 
-    def __init__(self, hidden_size):
+    def __init__(self, hidden_size, num_heads=4):
         super(TemporalAttention, self).__init__()
 
-        self.attention = nn.Linear(hidden_size, 1)
+        self.attn = nn.MultiheadAttention(embed_dim=hidden_size, num_heads=num_heads, batch_first=True)
 
     def forward(self, lstm_output):
         """
+        Apply multi-head self-attention to the sequence of LSTM outputs.
+
         Args:
-            lstm_output: (batch_size, time_steps, hidden_size)
+            lstm_output (Tensor): LSTM output tensor of shape
+                (batch_size, time_steps, hidden_size).
 
         Returns:
-            context: (batch_size, hidden_size)
+            Tensor: Attention-enhanced sequence of features with shape
+                (batch_size, time_steps, hidden_size).
         """
 
-        # Compute attention scores
-        scores = self.attention(lstm_output)          # (B,T,1)
+        attn_out, _ = self.attn(lstm_output, lstm_output, lstm_output)
 
-        # Normalize scores
-        weights = torch.softmax(scores, dim=1)        # (B,T,1)
-
-        # Weighted sum of LSTM outputs
-        context = torch.sum(weights * lstm_output, dim=1)
-
-        return context
+        return attn_out
+    
     
 class LRCN(nn.Module):
     """
     LRCN (Long-term Recurrent Convolutional Network) for video classification.
     
-    This model uses a ResNet backbone as a 2D CNN to extract spatial features from each video frame.
-    An LSTM network is then used to model the temporal dynamics across the sequence of frame features.
-    Dropout is applied before the final fully-connected layer that produces class logits.
+    This model uses a ResNet backbone as a 2D CNN feature extractor
+    to obtain spatial representations from individual video frames.
+    The frame-level features are processed by a bidirectional LSTM to
+    capture temporal dependencies. A multi-head self-attention module
+    refines the temporal representation, which is combined with average
+    temporal pooling before classification. Dropout and fully-connected
+    layers are used to produce the final class logits.
 
     Args:
         hidden_size (int): Number of features in the hidden state of the LSTM.
@@ -120,17 +132,22 @@ class LRCN(nn.Module):
         self.base_model = base_cnn
 
         # Define the LSTM to process the sequence of frame features.
-        #self.rnn = nn.LSTM(num_features, hidden_size, n_layers)
-        self.rnn = nn.LSTM(num_features, hidden_size, n_layers, batch_first=True, bidirectional=True)
+        self.rnn = nn.LSTM(num_features, 
+                           hidden_size, 
+                           n_layers, 
+                           batch_first=True, 
+                           bidirectional=True,
+                           dropout=0.3 if n_layers > 1 else 0)
 
         self.attention = TemporalAttention(hidden_size * 2)
         
-        # Define dropout for regularization.
-        self.dropout = nn.Dropout(dropout_rate)
-        
+        self.norm = nn.LayerNorm(hidden_size * 2)
+       
         # Final fully-connected layer to produce logits for each class.
-        #self.fc = nn.Linear(hidden_size, n_classes)
-        self.fc = nn.Linear(hidden_size * 2, n_classes)
+        self.fc = nn.Sequential(nn.Linear(hidden_size * 4, hidden_size),
+                                nn.ReLU(inplace=True),
+                                nn.Dropout(dropout_rate),
+                                nn.Linear(hidden_size, n_classes))
 
     def forward(self, x):
         """
@@ -141,10 +158,9 @@ class LRCN(nn.Module):
         
         Each frame is first processed independently by the CNN backbone to extract spatial
         features. The sequence of frame features is then passed through a bidirectional LSTM
-        to model temporal dependencies across the video. A temporal attention mechanism learns
-        the importance of each time step and computes a weighted combination of the LSTM outputs.
-        The resulting context vector is regularized using dropout and passed through the final
-        fully-connected layer to produce class logits.
+        to model temporal dependencies across the video. A multi-head self-attention mechanism 
+        refines the temporal features by allowing each time step to attend to all other time steps. 
+        The resulting sequence representation is aggregated using temporal pooling before classification.
 
         Args:
             x (Tensor): Input tensor of shape (batch_size, time_steps, channels, height, width).
@@ -154,24 +170,6 @@ class LRCN(nn.Module):
         """
         bs, ts, c, h, w = x.shape  # batch_size, time_steps, channels, height, width
         
-        ###Commenting out - start
-        # Process the first frame separately to initialize the LSTM hidden and cell states.
-        ##idx = 0
-        ##y = self.base_model(x[:, idx])
-        ##_, (hn, cn) = self.rnn(y.unsqueeze(1))
-        
-        # Iterate over the remaining frames, feeding each frame's features into the LSTM.
-        ##for idx in range(1, ts):
-        ##    y = self.base_model(x[:, idx])
-        ##    out, (hn, cn) = self.rnn(y.unsqueeze(1), (hn, cn))
-        
-        # Apply dropout to the output of the final time step.
-        ##out = self.dropout(out[:, -1])
-        
-        # Pass the final output through the fully-connected layer to get class logits.
-        ##out = self.fc(out)
-        ##return out
-        ###Commenting out - end
         # Extract CNN features for every frame
 
         features = []
@@ -186,11 +184,19 @@ class LRCN(nn.Module):
         # Process the whole sequence once
         lstm_out, _ = self.rnn(features)
 
-        # Temporal attention
-        context = self.attention(lstm_out)
+        attn_out = self.attention(lstm_out)
 
-        # Dropout + classifier
-        context = self.dropout(context)
+        attn_pool = attn_out.mean(dim=1)
+
+        # Average LSTM features
+        avg_pool = lstm_out.mean(dim=1)
+
+        # Layer normalization
+        attn_pool = self.norm(attn_pool)
+        avg_pool = self.norm(avg_pool)
+
+        # Concatenate
+        context = torch.cat([attn_pool, avg_pool], dim=1)
 
         out = self.fc(context)
 

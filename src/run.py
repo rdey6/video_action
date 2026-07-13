@@ -176,7 +176,7 @@ def main(args):
 
         # Define the loss function, optimizer, and learning rate scheduler
         loss_func = nn.CrossEntropyLoss(reduction='sum')
-        opt = optim.Adam(model.parameters(), lr=learning_rate)
+        opt = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
         lr_scheduler = ReduceLROnPlateau(opt, mode='min', factor=0.5, patience=5) #, verbose=1)
         #os.makedirs("./models", exist_ok=True)
         os.makedirs(b_dir, exist_ok=True)
@@ -204,8 +204,11 @@ def main(args):
 
         print('The overall test accuracy is {:.4f}%.'.format(100 * accuracy))
         # Optionally, generate a detailed test report or confusion matrix:
-        # print(get_test_report(targets, outputs, all_cats))
-        # print(get_confusion_matrix(targets, outputs, labels_dict, all_cats))
+        print("frame_dir:", frame_dir)
+        label_dict = {vid_cat: idx for idx, vid_cat in enumerate(sorted(os.listdir(frame_dir)))}
+        all_cats = list(label_dict.keys())
+        print(get_test_report(targets, outputs, all_cats))
+        #print(get_confusion_matrix(targets, outputs, label_dict, all_cats))
 
     else:
         raise ValueError('The mode argument must be either "train" or "eval".')
