@@ -177,8 +177,7 @@ def main(args):
         # Define the loss function, optimizer, and learning rate scheduler
         loss_func = nn.CrossEntropyLoss(reduction='sum', label_smoothing=0.1)
         #opt = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
-        opt = torch.optim.AdamW([{"params": model.base_model.layer3.parameters(), "lr": 1e-5},
-                                 {"params": model.base_model.layer4.parameters(), "lr": 1e-5},
+        opt = torch.optim.AdamW([{"params": model.base_model.parameters(), "lr": 1e-5},
                                  {"params": model.rnn.parameters(), "lr": 1e-4},
                                  {"params": model.attention.parameters(), "lr": 1e-4},
                                  {"params": model.norm.parameters(), "lr": 1e-4},

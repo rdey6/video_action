@@ -130,7 +130,6 @@ class LRCN(nn.Module):
         # Replace the original fc layer with an identity mapping so that raw features are returned.
         base_cnn.fc = Identity()
         self.base_model = base_cnn
-        self.freeze_cnn_layers()
 
         # Define the LSTM to process the sequence of frame features.
         self.rnn = nn.LSTM(num_features, 
@@ -149,32 +148,6 @@ class LRCN(nn.Module):
                                 nn.ReLU(inplace=True),
                                 nn.Dropout(dropout_rate),
                                 nn.Linear(hidden_size, n_classes))
-
-    def freeze_cnn_layers(self):
-        """
-        Freeze early ResNet layers and unfreeze deeper layers for fine-tuning.
-
-        Strategy:
-            - Freeze: conv1, bn1, layer1, layer2
-            - Train: layer3, layer4
-
-        This preserves generic ImageNet features while allowing deeper
-        convolutional layers to adapt to video action recognition.
-        """
-
-        # Freeze entire ResNet backbone first
-        for param in self.base_model.parameters():
-            param.requires_grad = False
-
-        # Unfreeze deeper ResNet layers
-        for param in self.base_model.layer3.parameters():
-            param.requires_grad = True
-
-        for param in self.base_model.layer4.parameters():
-            param.requires_grad = True
-
-        # Keep the backbone classifier replacement (Identity) frozen
-        self.base_model.fc.requires_grad = False
 
     def forward(self, x):
         """
