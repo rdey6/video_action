@@ -132,13 +132,27 @@ def compose_data_transforms(height, width, mean, std):
             - train_transforms: Composed transforms for the training set.
             - val_test_transforms: Composed transforms for the validation/test set.
     """
+    #train_transforms = transforms.Compose([
+    #    transforms.Resize((height, width)),
+    #    transforms.RandomHorizontalFlip(p=0.5),
+    #    transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
+    #    transforms.ToTensor(),
+    #    transforms.Normalize(mean, std),
+    #])
     train_transforms = transforms.Compose([
-        transforms.Resize((height, width)),
-        transforms.RandomHorizontalFlip(p=0.5),
-        transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean, std),
-    ])
+            transforms.Resize((256, 256)),
+            transforms.RandomResizedCrop(224, scale=(0.8, 1.0)),
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.ColorJitter(
+                brightness=0.3,
+                contrast=0.3,
+                saturation=0.3,
+                hue=0.05
+            ),
+            transforms.RandomRotation(10),
+            transforms.ToTensor(),
+            transforms.Normalize(mean, std)
+        ])
     val_test_transforms = transforms.Compose([
         transforms.Resize((height, width)),
         transforms.ToTensor(),

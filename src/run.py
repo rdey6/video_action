@@ -153,7 +153,7 @@ def main(args):
                         "attention": True,
                         "batch_size": batch_size,
                         "epochs": n_epochs,
-                        "optimizer": "Adam",
+                        "optimizer": "AdamW",
                         "learning_rate": learning_rate
                         }
                 )
@@ -175,8 +175,15 @@ def main(args):
         dataloaders = train_val_dloaders(tr_dataset, val_dataset, batch_size, model_type)
 
         # Define the loss function, optimizer, and learning rate scheduler
-        loss_func = nn.CrossEntropyLoss(reduction='sum')
-        opt = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+        loss_func = nn.CrossEntropyLoss(reduction='sum', label_smoothing=0.1)
+        #opt = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
+        opt = torch.optim.AdamW([{"params": model.base_model.layer3.parameters(), "lr": 1e-5},
+                                 {"params": model.base_model.layer4.parameters(), "lr": 1e-5},
+                                 {"params": model.rnn.parameters(), "lr": 1e-4},
+                                 {"params": model.attention.parameters(), "lr": 1e-4},
+                                 {"params": model.norm.parameters(), "lr": 1e-4},
+                                 {"params": model.fc.parameters(), "lr": 1e-4},
+                                ], weight_decay=1e-2)
         lr_scheduler = ReduceLROnPlateau(opt, mode='min', factor=0.5, patience=5) #, verbose=1)
         #os.makedirs("./models", exist_ok=True)
         os.makedirs(b_dir, exist_ok=True)
@@ -216,3 +223,4 @@ def main(args):
 if __name__ == "__main__":
     args = args_parser()
     main(args)
+    wandb.finish()
