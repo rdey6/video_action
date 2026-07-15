@@ -1,12 +1,24 @@
 """
 Module: models.py
 
-This module defines an enhanced LRCN (Long-term Recurrent Convolutional Network)
-model for video classification. The model combines a 2D CNN backbone (e.g., ResNet)
-for spatial feature extraction from individual frames with a bidirectional LSTM for
-temporal modeling across frame sequences. A multi-head self-attention mechanism
-refines temporal representations before feature aggregation and classification through
-a fully-connected prediction head.
+This module defines an enhanced LRCN (Long-term Recurrent Convolutional Network) and
+an I3D (Inflated 3D ConvNet) model for video classification. 
+
+The LRCN model combines a 2D CNN backbone (e.g., ResNet) for spatial feature extraction 
+from individual frames with a bidirectional LSTM for temporal modeling across frame sequences. 
+A multi-head self-attention mechanism refines temporal representations before feature 
+aggregation and classification through a fully-connected prediction head.
+
+The I3D architecture extends 2D CNNs into the temporal domain by inflating
+2D convolutional filters into 3D convolutions, allowing the model to jointly
+learn spatial and temporal features from video clips. The model uses a pretrained I3D backbone 
+and replaces the final classification layer for the target dataset.
+Input format:
+    (batch_size, channels, time_steps, height, width)
+
+Example:
+    Batch of 16 RGB clips with 32 frames:
+        (16, 3, 32, 224, 224)
 
 Classes:
     Identity: A helper module that returns the input unchanged. It is used to replace
@@ -16,11 +28,13 @@ Classes:
     LRCN: The main video classification model integrating CNN feature extraction,
           bidirectional LSTM temporal modeling, temporal attention, pooling, and
           fully-connected classification layers.
+    I3D: Inflated 3D ConvNet (I3D) for video classification.
 """
 
 import torch.nn as nn
 from torchvision import models
 import torch
+from i3d import InceptionI3d
 
 class Identity(nn.Module):
     """
@@ -201,3 +215,71 @@ class LRCN(nn.Module):
         out = self.fc(context)
 
         return out
+    
+class I3D(nn.Module):
+    """
+    Inflated 3D ConvNet (I3D) for video classification.
+
+    The model uses an I3D backbone pretrained on Kinetics and fine-tunes
+    the final classification layer for the target number of classes.
+
+    Args:
+        n_classes (int):
+            Number of output classes.
+
+        pretrained (bool):
+            Whether to load pretrained Kinetics weights.
+
+        dropout_rate (float):
+            Dropout probability before classification.
+
+    """
+
+    def __init__(
+        self,
+        n_classes,
+        pretrained=True,
+        dropout_rate=0.5
+    ):
+        super(I3D, self).__init__()
+
+        # RGB input I3D backbone
+        self.base_model = InceptionI3d(
+            num_classes=400,
+            in_channels=3
+        )
+
+        # Load pretrained Kinetics weights
+        if pretrained:
+            self.base_model.load_state_dict(
+                torch.load(
+                    "../weights/rgb_imagenet.pt",
+                    map_location="cpu"
+                )
+            )
+
+        # Replace final classification layer
+        self.base_model.replace_logits(n_classes)
+
+        self.dropout = nn.Dropout(dropout_rate)
+
+
+    def forward(self, x):
+        """
+        Forward pass.
+
+        Args:
+            x:
+                Video tensor with shape:
+                (batch_size, channels, time_steps, height, width)
+
+        Returns:
+            Classification logits:
+                (batch_size, n_classes)
+        """
+
+        x = self.base_model(x)
+
+        x = self.dropout(x)
+
+        return x
