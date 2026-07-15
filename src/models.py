@@ -34,7 +34,7 @@ Classes:
 import torch.nn as nn
 from torchvision import models
 import torch
-from pytorch_i3d.pytorch_i3d import InceptionI3d
+from pytorch-i3d.pytorch_i3d import InceptionI3d
 
 class Identity(nn.Module):
     """
