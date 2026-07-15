@@ -286,6 +286,9 @@ class I3D(nn.Module):
 
         x = self.base_model(x)
 
+        # Global average over remaining temporal/spatial dimensions
+        x = x.mean(dim=[2, 3, 4])
+
         x = self.dropout(x)
 
         return x
