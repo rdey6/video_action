@@ -6,4 +6,3 @@ tqdm
 numpy
 Pillow
 wandb
-i3d
