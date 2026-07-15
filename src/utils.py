@@ -109,10 +109,6 @@ def transform_stats(model='lrcn'):
         h, w = 112, 112
         mean = [0.43216, 0.394666, 0.37645]
         std = [0.22803, 0.22145, 0.216989]
-    elif model == 'i3d':
-        h, w = 224, 224
-        mean = [0.43216, 0.394666, 0.37645]
-        std = [0.22803, 0.22145, 0.216989]
     else:
         raise ValueError('model_type arg is undefined....')
     return h, w, mean, std
@@ -189,9 +185,9 @@ def train_val_dloaders(train_dataset, val_dataset, batch_size, model='lrcn'):
                             shuffle=False, collate_fn=collate_fn_rnn)
     else:
         train_dl = DataLoader(train_dataset, batch_size=batch_size,
-                              shuffle=True, collate_fn=collate_fn_i3d)
+                              shuffle=True, collate_fn=collate_fn_r3d_18)
         val_dl = DataLoader(val_dataset, batch_size=2 * batch_size,
-                            shuffle=False, collate_fn=collate_fn_i3d)
+                            shuffle=False, collate_fn=collate_fn_r3d_18)
     dataloaders = {'train': train_dl, 'val': val_dl}
     return dataloaders
 
@@ -216,7 +212,7 @@ def test_dloaders(test_dataset, batch_size, model='lrcn'):
                              shuffle=False, collate_fn=collate_fn_rnn)
     else:
         test_dl = DataLoader(test_dataset, batch_size=2 * batch_size,
-                             shuffle=False, collate_fn=collate_fn_i3d)
+                             shuffle=False, collate_fn=collate_fn_r3d_18)
     dataloaders = {'test': test_dl}
     return dataloaders
 
@@ -245,38 +241,6 @@ def collate_fn_r3d_18(batch):
     labels_tensor = torch.stack(label_batch)
     return imgs_tensor, labels_tensor
 
-def collate_fn_i3d(batch):
-    """
-    Collate function for I3D models.
-
-    Converts video tensors from:
-        (T, C, H, W)
-    to:
-        (C, T, H, W)
-
-    and stacks batches into:
-        (B, C, T, H, W)
-    """
-
-    imgs_batch, label_batch = zip(*batch)
-    imgs_batch = [
-        imgs for imgs in imgs_batch
-        if len(imgs) > 0
-    ]
-    label_batch = [
-        label for imgs, label in zip(batch, label_batch)
-        if len(imgs) > 0
-    ]
-
-    # (B,T,C,H,W)
-    imgs_tensor = torch.stack(imgs_batch)
-
-    # (B,C,T,H,W)
-    imgs_tensor = imgs_tensor.permute(0, 2, 1, 3, 4)
-
-    labels_tensor = torch.tensor(label_batch)
-
-    return imgs_tensor, labels_tensor
 
 def collate_fn_rnn(batch):
     """

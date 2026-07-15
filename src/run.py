@@ -35,7 +35,7 @@ import wandb
 
 from video_datasets import VideoDataset, load_dataset, dataset_split
 from utils import transform_stats, compose_data_transforms, train_val_dloaders, test_dloaders
-from models import LRCN, I3D
+from models import LRCN
 from train import train
 from test import test, get_test_report, get_confusion_matrix
 
@@ -73,7 +73,7 @@ def args_parser():
     parser.add_argument('-nc', '--n_classes', type=int, help='Number of classes for the classification task', required=True)
 
     parser.add_argument('-c', '--ckpt', help='Path for loading trained model checkpoints')
-    parser.add_argument('-mt', '--model_type', help='I3D or LRCN', default='lrcn')
+    parser.add_argument('-mt', '--model_type', help='3D CNN or LRCN', default='lrcn')
     parser.add_argument('-cnn', '--cnn_backbone', default='resnet34', help='2D CNN backbone - options: resnet18, resnet34, resnet50, resnet101, resnet152')
     parser.add_argument('-p', '--pretrained', help='Use pretrained 2D CNN backbone', default=True)
     parser.add_argument('-rhs', '--rnn_hidden_size', type=int, default=100, help='Number of neurons in the RNN/LSTM hidden layer')
@@ -140,11 +140,10 @@ def main(args):
     tr_transforms, val_ts_transforms = compose_data_transforms(h, w, mean, std)
 
     # Initialize the model (LRCN)
-    if model_type == 'lrcn':
-        model = LRCN(hidden_size=rnn_hidden_size, n_layers=rnn_n_layers, dropout_rate=dropout,
-                     n_classes=n_classes, pretrained=pretrained, cnn_model=cnn_backbone)
+    model = LRCN(hidden_size=rnn_hidden_size, n_layers=rnn_n_layers, dropout_rate=dropout,
+                 n_classes=n_classes, pretrained=pretrained, cnn_model=cnn_backbone)
 
-        wandb.init(project="UCF50-LRCN",
+    wandb.init(project="UCF50-LRCN",
                 name="BiLSTM_TemporalAttention",
                 config={"model": "LRCN",
                         "cnn_backbone": cnn_backbone,
@@ -158,21 +157,6 @@ def main(args):
                         "learning_rate": learning_rate
                         }
                 )
-        
-    if model_type == 'i3d':
-        # Initialize the model (I3D)
-        model = I3D(n_classes=n_classes, pretrained=pretrained, dropout_rate=dropout)
-
-        wandb.init(project="UCF50-I3D",
-                   name="I3D_Kinetics_Finetune",
-                   config={"model": "I3D",
-                           "batch_size": batch_size,
-                           "epochs": n_epochs,
-                           "optimizer": "AdamW",
-                           "learning_rate": learning_rate,
-                           "frames_per_video": fr_per_vid})
-
-    
     
     if mode == 'train':
         # Load dataset and split into train/validation/test
@@ -193,15 +177,13 @@ def main(args):
         # Define the loss function, optimizer, and learning rate scheduler
         loss_func = nn.CrossEntropyLoss(reduction='sum', label_smoothing=0.1)
         #opt = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-4)
-        if model_type == 'lrcn':
-            opt = torch.optim.AdamW([{"params": model.base_model.parameters(), "lr": 1e-5},
-                                    {"params": model.rnn.parameters(), "lr": 1e-4},
-                                    {"params": model.attention.parameters(), "lr": 1e-4},
-                                    {"params": model.norm.parameters(), "lr": 1e-4},
-                                    {"params": model.fc.parameters(), "lr": 1e-4},
-                                    ], weight_decay=1e-2)
-        if model_type == 'i3d':
-            opt = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-2)
+        opt = torch.optim.AdamW([{"params": model.base_model.layer3.parameters(), "lr": 1e-5},
+                                 {"params": model.base_model.layer4.parameters(), "lr": 1e-5},
+                                 {"params": model.rnn.parameters(), "lr": 1e-4},
+                                 {"params": model.attention.parameters(), "lr": 1e-4},
+                                 {"params": model.norm.parameters(), "lr": 1e-4},
+                                 {"params": model.fc.parameters(), "lr": 1e-4},
+                                ], weight_decay=1e-2)
         lr_scheduler = ReduceLROnPlateau(opt, mode='min', factor=0.5, patience=5) #, verbose=1)
         #os.makedirs("./models", exist_ok=True)
         os.makedirs(b_dir, exist_ok=True)
