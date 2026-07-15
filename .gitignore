@@ -6,12 +6,6 @@ __pycache__/
 # Jupyter notebooks checkpoints
 .ipynb_checkpoints/
 
-# Model checkpoints
-models/
-*.pt
-*.pth
-*.ckpt
-
 # Dataset and extracted frames
 data/
 dataset/
