@@ -1,8 +1,11 @@
 #!/bin/bash
 python run.py \
-    --ckpt /home/vince/HMDB_Vid_Classification/models/epoch4_model_wts.pt \
+    --ckpt /content/drive/MyDrive/model/video_action_best_model/best_model_wts.pt \
+    --cnn_backbone resnet50 \
     --model_type lrcn \
-    --n_classes 51 \
-    --model_type lrcn \
-    --batch_size 4 \
-    --mode eval
+    --rnn_hidden_size 256 \
+    --rnn_n_layers 2 \
+    --n_classes 50 \
+    --batch_size 32 \
+    --mode eval \
+    --frame_dir "/content/UCF50/UCF50"

@@ -12,10 +12,6 @@ dataset/
 frames/
 videos/
 
-# Experiment logs
-wandb/
-logs/
-runs/
 
 # TensorBoard
 tensorboard/
