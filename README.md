@@ -176,7 +176,8 @@ By tweaking these parameters, you can study their impact on model performance an
   Execute `test.sh` after updating the `--ckpt` argument to point to the best model checkpoint to evaluate the model.
 
 ## Errors Found and Fixed
- - Video-level data leakage was addressed by introducing group-aware dataset splitting to ensure that frames from the same video do not appear across training, validation, and test sets.
+- Video-level data leakage was addressed by introducing group-aware dataset splitting to ensure that frames from the same video do not appear across training, validation, and test sets.
+- Added the missing video frame extraction functionality to the dataset pipeline. The original implementation only supported loading pre-extracted frame directories, so the updated version enables direct processing of raw video files by extracting and storing frame sequences automatically before training.
 - Added `batch_first=True` to the LSTM to ensure the input tensor format matches the dataloader output (batch, time, feature).
 
 ## Model Improvements
